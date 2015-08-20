@@ -42,26 +42,27 @@ Bonus:
 
 start syntax Program = Command*; 
  
-syntax FunDef = "to" FunId VarId* Command* "end";
+syntax FunDef = "to" FunId id VarId* Command* "end";
 syntax FunCall = FunId Expr* ";";
 
-/*syntax ArithmeticExpr = (VarId | Number >> Arithmetic >> VarId | Number) |
-		ArithmeticExpr >> Arithmetic >> ArithmeticExpr ; 
+/*syntax ArithmeticExpr = (VarId | Number | Arithmetic | VarId | Number) |
+		ArithmeticExpr | Arithmetic | ArithmeticExpr ; 
 		
-syntax BooleanExpr = (VarId | Number >> BooleanExpr >> VarId | Number) |
-		BooleanExpr >> Arithmetic >> ArithmeticExpr;  */
+syntax BooleanExpr = (VarId | Number | BooleanExpr | VarId | Number) |
+		BooleanExpr | Arithmetic | ArithmeticExpr;  */
 
 syntax Value = VarId | Number | Boolean;
 syntax Operator = Arithmetic > Comparison > Logical;
 syntax Operation = Value Operator Value | Operation Operator Operation;
-syntax Expr = Value | Operation;
+syntax Expr1 = Value | Operation;
 
 
 syntax Command = ControlFlow | Drawing | FunDef | FunCall;
 syntax ControlFlow = If | IfElse | While | Repeat;
 
-syntax Directions = "forward" | "fd" | "back" | "bk" | "right" | "rt" | "left";
-syntax SimpleActions = "home" | "pu"| "penup"| "pendown" | "pd";
+syntax Directions = "forward" | "fd" | "back" | "bk" | "right" | "rt" | "left" | "lt";
+syntax PenActions = "pu"| "penup"| "pendown" | "pd";
+syntax SimpleActions = "home" | PenActions;
 syntax ActionExpr = Directions Expr ;
 syntax Drawing = ( SimpleActions | ActionExpr )";";
 
@@ -70,16 +71,16 @@ syntax IfElse = "ifelse"  Expr Block Block;
 syntax While = "while" Expr Block;
 syntax Repeat = "repeat" Expr Block; 
 
-syntax Block = "["  Command+   "]";
+syntax Block = "[" Command* "]";
 
 
 keyword Reserved = "if" | "ifelse" | "while" | "repeat" | "forward" | "back" | "right"
 					| "back" | "right" | "left" | "pendown" | "penup" | "to" | "true"
 					| "false" | "end";
 
-syntax Expr1 
-   = Bool
-   | Num
+syntax Expr 
+   = Boolean
+   | Number
    | VarId
    > left   div: Expr "/" Expr 
    > left   mul: Expr "*" Expr
@@ -101,15 +102,17 @@ syntax Expr1
 lexical Number1 = "-"?[0-9]+"."?[0-9]*;
 lexical Number ="-"? ([0-9]* ".")? [0-9]+ !>> [0-9]; 
 lexical Boolean = "true" | "false";
-lexical Arithmetic = "/" |  "*" > "+"  |  "-";
+
+/* Todo*/
+lexical Arithmetic = "/" |  "*" > "+"  |  "-"; 
 lexical Comparison = "\>" | "\<" | "\>=" |  "\<=" |  "="  | "!=";
 lexical Logical = "&&" | "||"; 
 
 lexical VarId
-  = ":" [a-zA-Z][a-zA-Z0-9]* !>> [a-zA-Z0-9];
+  = ":" [a-zA-Z][a-zA-Z0-9]* \ Reserved !>> [a-zA-Z0-9];
   
 lexical FunId
-  = [a-zA-Z][a-zA-Z0-9]* !>> [a-zA-Z0-9];
+  = [a-zA-Z][a-zA-Z0-9]* \ Reserved !>> [a-zA-Z0-9];
 
 
 layout Standard 
@@ -130,25 +133,40 @@ lexical Comment
   
   
   bool canParseOperation(str s){
-  	return canParse(#Program, s);
+  	return canParse(#Operation, s);
   }
   
-  bool canParse( str s){
+  bool canParseProgram(str s){
+ 	return canParse(#Program, s); 
+  }
+
+  bool canParseExpr(str s){
+ 	return canParse(#Expr,s); 
+  }
+
+  bool canParseNum(str s){
+ 	return canParse(#Number,s); 
+  }
+
+  bool canParse(cls, str s){
    try {
-   	parse(#Program, s);
+    /amb(_) := parse(cls, s);
    	return true;
    }catch :return false;
   }
   
    /* True */
-  test bool if3() = true := canParse("if true [fd 5;]");
-  test bool x3() = true := canParse("to dash :n :len repeat :n [ pd; fd :len; pu; fd :len; ] bk :len; pd;end");
-  
-   /* False */
-  test bool n1() = false := canParse("-1-");
-  test bool e2() = false := canParse("++7");
-  test bool e3() = false := canParse("-+12232");
-  test bool b1() = false := canParse("[]");
-  
+  test bool if3() = true := canParseProgram("if true [fd 5;]");
+  test bool x3() = true := canParseProgram("to dash :n :len repeat :n [ pd; fd :len; pu; fd :len; ] bk :len; pd;end");
+  test bool n1() = true := canParseNum(".03"); 
+  test bool n2() = true := canParseNum("01.03"); 
+  test bool e4() = true := canParseExpr("2+1-2");
 
+   /* False */
+  test bool n5() = false := canParseProgram("-1-");
+  test bool e2() = false := canParseProgram("++7");
+  test bool e3() = false := canParseProgram("-+12232");
+  test bool b1() = false := canParseProgram("[]");
+  test bool e1() = false := canParseExpr("+1-2");
+  test bool e5() = false := canParseExpr("+-12");
   
