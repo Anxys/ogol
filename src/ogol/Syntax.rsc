@@ -40,10 +40,10 @@ Bonus:
 
 */
 
-start syntax Program = Command*; 
+start syntax Program = Command* commands; 
  
-syntax FunDef = "to" FunId id VarId* Command* "end";
-syntax FunCall = FunId Expr* ";";
+syntax FunDef = "to" FunId id VarId* args Command* commands "end";
+syntax FunCall = FunId id Expr* exprs ";";
 
 /*syntax ArithmeticExpr = (VarId | Number | Arithmetic | VarId | Number) |
 		ArithmeticExpr | Arithmetic | ArithmeticExpr ; 
@@ -74,9 +74,9 @@ syntax Repeat = "repeat" Expr Block;
 syntax Block = "[" Command* "]";
 
 
-keyword Reserved = "if" | "ifelse" | "while" | "repeat" | "forward" | "back" | "right"
+keyword Reserved =  "if" | "ifelse" | "while" | "repeat" | "forward" | "back" | "right"
 					| "back" | "right" | "left" | "pendown" | "penup" | "to" | "true"
-					| "false" | "end";
+					| "false" | "fd" | "end"| "pu" | "penup"| "pendown" | "pd"| "bk"| "rt"| "lt";
 
 syntax Expr 
    = Boolean
@@ -109,10 +109,10 @@ lexical Comparison = "\>" | "\<" | "\>=" |  "\<=" |  "="  | "!=";
 lexical Logical = "&&" | "||"; 
 
 lexical VarId
-  = ":" [a-zA-Z][a-zA-Z0-9]* \ Reserved !>> [a-zA-Z0-9];
-  
+  = ":" ([a-zA-Z][a-zA-Z0-9]*) \ Reserved !>> [a-zA-Z0-9];
+ 	  
 lexical FunId
-  = [a-zA-Z][a-zA-Z0-9]* \ Reserved !>> [a-zA-Z0-9];
+  = ([a-zA-Z][a-zA-Z0-9]*) \ Reserved !>> [a-zA-Z0-9];
 
 
 layout Standard 

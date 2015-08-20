@@ -1,0 +1,22 @@
+to squareDash :n :len
+   if :n < 5 [
+	   to dash :n :len
+	      repeat :n [ pd; fd :len; pu; fd :len; 
+	      	to deeplyNestedFun :n
+	      		fd :n;
+	      	end
+	      ]
+	      bk :len;
+	      pd ;
+	   end
+	   repeat 4 [ dash :n :len; rt 90; ]
+   ]
+end
+
+to func1 :n :len
+	squareDash :n :len;
+end
+
+to func2 
+	func1 2 3;
+end

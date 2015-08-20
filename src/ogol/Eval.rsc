@@ -3,7 +3,6 @@ module ogol::Eval
 import ogol::Syntax;
 import ogol::Canvas;
 import ParseTree;
-
 import String;
 import util::Math;
 alias FunEnv = map[FunId id, FunDef def];
@@ -39,7 +38,7 @@ Canvas eval(p:(Program)`<Command* cmds>`){
 	funenv = collectFunDefs(p);
 	varEnv = ();
 	state = <<0, false, <0,0>>,[]>;
-
+	println(funenv);
 	var desugared = desugar(p);	
 
 	for (c <- desugared){
@@ -71,33 +70,55 @@ State eval(Drawing cmd, FunEnv fenv, VarEnv venv, State state){
 
 //sin(80)*fd = y  cos(80)* fd = x
 State eval((Drawing)`forward <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
-
+		curLoc = <state.turtle.position.x,state.turtle.position.y>;
+		state.turtle.position = <toReal(state.turtle.position.x) + cos(57,2957 * state.turtle.dir), toReal(state.turtle.position.y) + sin(57,2957 * state.turtle.dir)>;
+		if(state.turtle.pendown){
+                state.canvas = state.canvas + line(curLoc, newLoc);
+        }	
+        return state;
 }
 
 State eval((Drawing)`back <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
-		
+		curLoc = <state.turtle.position.x,state.turtle.position.y>;
+		state.turtle.position = <toReal(state.turtle.position.x) - cos(57,2957 * state.turtle.dir), toReal(state.turtle.position.y) - sin(57,2957 * state.turtle.dir)>;
+		if(state.turtle.pendown){
+                state.canvas = state.canvas + line(curLoc, newLoc);
+        }	
+        return state;
 }
 
 State eval((Drawing)`home;` , FunEnv fenv, VarEnv venv, State state){
-        return <<state.turtle.dir, state.turtle.pendown, <0,0>>, state.canvas>;
+		curLoc = <state.turtle.position.x,state.turtle.position.y>;
+		state.turtle.position = <0,0>; 
+		if(state.turtle.pendown){
+                state.canvas = state.canvas + line(curLoc, newLoc);
+        }	
+        return state;
 }
 State eval((PenActions)`pendown` , FunEnv fenv, VarEnv venv, State state){
-        return <<state.turtle.dir, true, state.turtle.position>, state.canvas>;
+		state.turtle.pendown = true;
+        return state;
 }
 State eval((PenActions)`penup` , FunEnv fenv, VarEnv venv, State state){
-        return <<state.turtle.dir, false, state.turtle.position>, state.canvas>;
+		state.turtle.pendown = false;
+        return state;
 }
 State eval((Drawing)`right <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
-        return <<state.turtle.dir + toInt(eval(e, venv).r), state.turtle.pendown, state.turtle.position>,state.canvas>;
+		state.turtle.dir = state.turtle.dir + toInt(eval(e, venv).r);
+        return state;
 }
 
 State eval((Drawing)`left <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
-        return <<state.turtle.dir - toInt(eval(e, venv).r), state.turtle.pendown, state.turtle.position>,state.canvas>;
+		state.turtle.dir = state.turtle.dir - toInt(eval(e, venv).r);
+        return state ;
 }
 
 
-State eval((FunCall)`to <Expr* exprs>;` , FunEnv fenv, VarEnv venv, State state){
-	return for(e <- exprs); 
+State eval((FunCall)`<FunId id> <Expr* exprs>;` , FunEnv fenv, VarEnv venv, State state){
+	f = fenv[id];
+	 for(e <- exprs){
+                 state = eval(e, venv); 
+	 }; 
 }
 
 State eval((Block)`[ <Command* cmd> ]` , FunEnv fenv, VarEnv venv, State state){
@@ -107,7 +128,7 @@ State eval((Block)`[ <Command* cmd> ]` , FunEnv fenv, VarEnv venv, State state){
 }
 
 State eval((ControlFlow)`ifelse <Expr e> <Block b1> <Block b2>`, FunEnv fenv, VarEnv venv, State state){
-	if(eval(e).b,varEnv){
+	if(eval(e, varEnv).b){
 		return eval(b1, fenv, varenv,state);
 	} else{
 		return eval(b2, varenv,state);
@@ -179,6 +200,6 @@ test bool testMul() = eval((Expr)`:x * 2`, ((VarId)`:x`: number(2.0))) == number
 
 test bool testDiv() = eval((Expr)`:x / 2`, ((VarId)`:x`: number(4.0))) == number(2.0);
 
-test bool testDiv() = eval((Expr)`4.0 - 2.0`,()) == number(2.0);
+test bool testMin() = eval((Expr)`4.0 - 2.0`,()) == number(2.0);
 
-test bool testDiv() = eval((Expr)`:x + 2`, ((VarId)`:x`: number(4.0))) == number(6.0);
+test bool testPlus() = eval((Expr)`:x + 2`, ((VarId)`:x`: number(4.0))) == number(6.0);
