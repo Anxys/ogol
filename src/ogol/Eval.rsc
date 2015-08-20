@@ -33,6 +33,8 @@ alias Turtle = tuple[int dir, bool pendown, Point position];
 
 alias State = tuple[Turtle turtle, Canvas canvas];
 
+FunEnv collectFunDefs(Program p) = (f.id : f| /FunDef f:= p);
+
 // Top-level eval function
 Canvas eval(p:(Program)`<Command* cmds>`){
 	funenv = collectFunDefs(p);
@@ -44,7 +46,6 @@ Canvas eval(p:(Program)`<Command* cmds>`){
 	for (c <- desugared){
 		state = eval(c, funenv, varEnv, state);
 	}
-
 	return state.canvas;
 }
 
@@ -59,10 +60,11 @@ Program desugar(p:(Program)`<Command* cmds>`){
     case (Directions)`bk`=> (Directions)`back`   
     case (PenActions)`pu`=> (PenActions)`penup`   
     case (PenActions)`pd`=> (PenActions)`pendown`   
+    case (PenActions)`pd`=> (PenActions)`pendown`   
+    case (Expr)`<Expr l>  \<= <Expr r>`=> (Expr)`<Expr r> \>= <Expr l>`   
   };
 }
 
-FunEnv collectFunDefs(Program p) = (f.id : f| /FunDef f:= p);
 
 
 State eval(Drawing cmd, FunEnv fenv, VarEnv venv, State state){
@@ -103,6 +105,7 @@ State eval((PenActions)`penup` , FunEnv fenv, VarEnv venv, State state){
 		state.turtle.pendown = false;
         return state;
 }
+
 State eval((Drawing)`right <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 		state.turtle.dir = state.turtle.dir + toInt(eval(e, venv).r);
         return state;
@@ -112,7 +115,6 @@ State eval((Drawing)`left <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 		state.turtle.dir = state.turtle.dir - toInt(eval(e, venv).r);
         return state ;
 }
-
 
 State eval((FunCall)`<FunId id> <Expr* exprs>;` , FunEnv fenv, VarEnv venv, State state){
 	f = fenv[id];
@@ -127,6 +129,11 @@ State eval((Block)`[ <Command* cmd> ]` , FunEnv fenv, VarEnv venv, State state){
 	}
 }
 
+State eval((ControlFlow)`repeat <Expr e> <Block b1>`, FunEnv fenv, VarEnv venv, State state){
+	int n = eval(e, varEnv).n;
+        for(int I <- [1 .. n + 1])
+        return eval(b, fenv, venv, state);
+}
 State eval((ControlFlow)`ifelse <Expr e> <Block b1> <Block b2>`, FunEnv fenv, VarEnv venv, State state){
 	if(eval(e, varEnv).b){
 		return eval(b1, fenv, varenv,state);
@@ -142,7 +149,38 @@ State eval((Command) cmd, FunEnv fenv, VarEnv venv, State state){
 int turn(State state, int i){
 	return e + i;
 }
-
+//Logic
+//And
+Value eval((Expr)`<Expr l> && <Expr r>`, VarEnv env)
+  = boolean (x && y)
+  when
+    boolean(x) := eval(l, env),
+    boolean(y) := eval(r, env);
+//Or
+Value eval((Expr)`<Expr l> || <Expr r>`, VarEnv env)
+  = boolean (x || y)
+  when
+    boolean(x) := eval(l, env),
+    boolean(y) := eval(r, env);
+//Comparison
+//gte
+Value eval((Expr)`<Expr l> \>= <Expr r>`, VarEnv env)
+  = number (x >= y)
+  when
+    number(x) := eval(l, env),
+    number(y) := eval(r, env);
+//Eq
+Value eval((Expr)`<Boolean l>=<Boolean r>`, VarEnv env)
+  = Boolean (x >= y)
+  when
+    Boolean(x) := eval(l, env),
+    Boolean(y) := eval(r, env);
+//not Eq
+Value eval((Expr)`<Boolean l>!=<Boolean r>`, VarEnv env)
+  = Boolean (x != y)
+  when
+    Boolean(x) := eval(l, env),
+    Boolean(y) := eval(r, env);
 //Div
 Value eval((Expr)`<Expr l> / <Expr r>`, VarEnv env)
   = number(x / y)
