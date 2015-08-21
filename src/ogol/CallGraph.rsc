@@ -6,7 +6,7 @@ import ParseTree;
 import analysis::graphs::Graph;
 
 alias FunctionCalls = Graph[str];
-alias FunctionsDef = List[str];
+alias FunctionsDef = list[str];
 
 //Get All Function Call locations
 map[str, tuple[str,str]] getFuncCallLocs(){
