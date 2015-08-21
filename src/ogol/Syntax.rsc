@@ -76,7 +76,7 @@ syntax Block = "[" Command* "]";
 
 keyword Reserved =  "if" | "ifelse" | "while" | "repeat" | "forward" | "back" | "right"
 					| "back" | "right" | "left" | "pendown" | "penup" | "to" | "true"
-					| "false" | "fd" | "end"| "pu" | "penup"| "pendown" | "pd"| "bk"| "rt"| "lt";
+					| "false" | "fd" | "end"| "pu" | "penup"| "pendown" | "pd"| "bk"| "rt"| "lt" | "home";
 
 syntax Expr 
    = Boolean
@@ -158,6 +158,7 @@ lexical Comment
    /* True */
   test bool if3() = true := canParseProgram("if true [fd 5;]");
   test bool x3() = true := canParseProgram("to dash :n right :n; pd;end");
+  test bool x8() = true := canParseProgram("home;");
   test bool n1() = true := canParseNum(".03"); 
   test bool n2() = true := canParseNum("01.03"); 
   test bool e4() = true := canParseExpr("2+1-2");

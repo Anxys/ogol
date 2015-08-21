@@ -5,7 +5,6 @@ import ogol::Canvas;
 import ParseTree;
 import String;
 import util::Math;
-import util::Eval;
 import IO;
 alias FunEnv = map[FunId id, FunDef def];
 
@@ -40,14 +39,15 @@ FunEnv collectFunDefs(Program p) = (f.id : f| /FunDef f:= p);
 
 // Top-level eval function
 Canvas eval(p:(Program)`<Command* cmds>`){
-	funenv = collectFunDefs(p);
-	println(funenv);
+	Program desugared = desugar(p);	
+	funenv = collectFunDefs(desugared);
+//	println(funenv);
 	varEnv = ();
 	initialState = <<0, false, <0,0>>,[]>;
 	state = initialState;
-	Program desugared = desugar(p);	
 
 	for (c <- desugared.commands){
+	    println(unparse(c));
 		state = eval(c, funenv, varEnv, state);
 	}
 	return state.canvas;
@@ -63,8 +63,7 @@ Program desugar(p:(Program)`<Command* cmds>`){
     case (Directions)`fd`=> (Directions)`forward`   
     case (Directions)`bk`=> (Directions)`back`   
     case (Directions)`rt`=> (Directions)`right`   
-    case (Directions)`lt`=> (Directions)`left`   
-    case (Directions)`left`=> (Directions)`left`   
+    case (Directions)`lt`=> (Directions)`left` 
     case (PenActions)`pu`=> (PenActions)`penup`   
     case (PenActions)`pd`=> (PenActions)`pendown`   
   };
@@ -75,8 +74,8 @@ Program desugar(p:(Program)`<Command* cmds>`){
 //Radial = 180 degrees / pie..yum
 State eval((Command)`forward <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 		curLoc = <state.turtle.position.x,state.turtle.position.y>;
-		state.turtle.position = <toInt(toReal(state.turtle.position.x) + (eval(e, venv).r * cos((180.0/PI()) * state.turtle.dir)))
-								,toInt(toReal(state.turtle.position.y) + (eval(e, venv).r * sin((180.0/PI()) * state.turtle.dir)))>;
+		state.turtle.position = <state.turtle.position.x + toInt((eval(e, venv).r * cos((PI()/180) * state.turtle.dir)))
+								,state.turtle.position.y + toInt((eval(e, venv).r * sin((PI()/180) * state.turtle.dir)))>;
 		if(state.turtle.pendown){
                 state.canvas = state.canvas + line(curLoc, state.turtle.position);
         }	
@@ -85,7 +84,9 @@ State eval((Command)`forward <Expr e> ;` , FunEnv fenv, VarEnv venv, State state
 
 State eval((Command)`back <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 		curLoc = <state.turtle.position.x,state.turtle.position.y>;
-		state.turtle.position = <toReal(state.turtle.position.x) - cos((180.0/PI()) * state.turtle.dir), toReal(state.turtle.position.y) - sin(cos((180.0/PI()) * state.turtle.dir) * state.turtle.dir)>;
+		state.turtle.position = <state.turtle.position.x - toInt((eval(e, venv).r * cos((PI()/180) * state.turtle.dir)))
+								,state.turtle.position.y - toInt((eval(e, venv).r * sin((PI()/180) * state.turtle.dir)))>;
+		
 		if(state.turtle.pendown){
                 state.canvas = state.canvas + line(curLoc, state.turtle.position);
         }	
@@ -95,9 +96,9 @@ State eval((Command)`back <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 State eval((Command)`home;` , FunEnv fenv, VarEnv venv, State state){
 		curLoc = <state.turtle.position.x,state.turtle.position.y>;
 		state.turtle.position = <0,0>; 
-		if(state.turtle.pendown){
-                state.canvas = state.canvas + line(curLoc, newLoc);
-        }	
+		//if(state.turtle.pendown){
+             //   state.canvas = state.canvas + line(curLoc, state.turtle.position);
+        //}	
         return state;
 }
 State eval((Command)`pendown;` , FunEnv fenv, VarEnv venv, State state){
@@ -114,7 +115,6 @@ State eval((Command)`right <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 		if(newDir >= 360){
 			newDir = newDir	- 360;
 		}
-		
 		state.turtle.dir = newDir;
         return state;
 }
@@ -129,8 +129,7 @@ State eval((Command)`left <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 }
 
 //wat
-State eval((Command)`<FunDef f>` , FunEnv fenv, VarEnv venv, State state){
-     fenv[f.id] = f;
+State eval((Command)`to <FunId id> <VarId* args> <Command* commands> end` , FunEnv fenv, VarEnv venv, State state){
 	 return state;
 }
 
@@ -138,16 +137,15 @@ State eval((Command)`<FunDef f>` , FunEnv fenv, VarEnv venv, State state){
 State eval((Command)`<FunId id> <Expr* exprs>;` , FunEnv fenv, VarEnv venv, State state){
      f = fenv[id];
      newVars = venv; //Make a copy. Scoping doesn't matter, I guess. Maybe if I try implementing assignment
-	 println(evalType(f.args));
 	 println(exprs);
 
-     for (arg <- zip(f.args, exprs)){//Wat am I even doing
-    	newVars  += (arg[0]: arg[1]);
+     for (varId <- f.args, expr <- exprs){//Wat am I even doing
+    	newVars[varId] = eval(expr, venv);
      }  
 
 	 for(c <- f.commands){
-        state = eval(c, newVars); 
-	 }; 
+        state = eval(c, fenv, newVars, state); 
+	 }
 
 	 return state;
 }
@@ -162,7 +160,7 @@ State eval((Block)`[ <Command* cmd> ]` , FunEnv fenv, VarEnv venv, State state){
 	return state;
 }
 
-State eval((ControlFlow)`repeat <Expr e> <Block b>`, FunEnv fenv, VarEnv venv, State state){
+State eval((Command)`repeat <Expr e> <Block b>`, FunEnv fenv, VarEnv venv, State state){
 	int n = toInt(eval(e, venv).r);
     for(int I <- [1 .. n + 1]){
         state =  eval(b, fenv, venv, state);
@@ -170,11 +168,11 @@ State eval((ControlFlow)`repeat <Expr e> <Block b>`, FunEnv fenv, VarEnv venv, S
     return state;
 }
 
-State eval((ControlFlow)`ifelse <Expr e> <Block b1> <Block b2>`, FunEnv fenv, VarEnv venv, State state){
+State eval((Command)`ifelse <Expr e> <Block b1> <Block b2>`, FunEnv fenv, VarEnv venv, State state){
 	if(eval(e, venv).b){
 		return eval(b1, fenv, venv,state);
 	} else{
-		return eval(b2, venv,state);
+		return eval(b2, fenv, venv, state);
 	}
 }
 
@@ -199,28 +197,28 @@ Value eval((Expr)`<Expr l> || <Expr r>`, VarEnv env)
 //Comparison
 //gte
 Value eval((Expr)`<Expr l> \>= <Expr r>`, VarEnv env)
-  = number (x >= y)
+  = boolean (x >= y)
   when
     number(x) := eval(l, env),
     number(y) := eval(r, env);
 //gte
 Value eval((Expr)`<Expr l> \> <Expr r>`, VarEnv env)
-  = number (x > y)
+  = boolean (x > y)
   when
     number(x) := eval(l, env),
     number(y) := eval(r, env);
 //Eq
-Value eval((Expr)`<Boolean l>=<Boolean r>`, VarEnv env)
-  = Boolean (x >= y)
+Value eval((Expr)`<Expr l>=<Expr r>`, VarEnv env)
+  = boolean (x >= y)
   when
-    Boolean(x) := eval(l, env),
-    Boolean(y) := eval(r, env);
+    x := eval(l, env),
+    y := eval(r, env);
 //not Eq
-Value eval((Expr)`<Boolean l>!=<Boolean r>`, VarEnv env)
-  = Boolean (x != y)
+Value eval((Expr)`<Expr l>!=<Expr r>`, VarEnv env)
+  = boolean (x != y)
   when
-    Boolean(x) := eval(l, env),
-    Boolean(y) := eval(r, env);
+    x := eval(l, env),
+    y := eval(r, env);
 //Div
 Value eval((Expr)`<Expr l> / <Expr r>`, VarEnv env)
   = number(x / y)
@@ -262,8 +260,8 @@ test bool desugarTest () = (Program)`forward 10;` := desugar((Program)`fd 10;`);
 test bool desugarTest1 () = (Program)`ifelse true [ forward 10; ] []` := desugar((Program)`if true [ forward 10; ]`); 
 
 //ControlFlow
-test bool d1() = <<20,false,<0,0>>,[]> := eval((ControlFlow)`repeat 2[right 10;]`, (), (), <<0, false, <0,0>>,[]>);
-test bool d5() = <<10,false,<0,0>>,[]> := eval((ControlFlow)`ifelse true [right 10;][]`, (), (), <<0, false, <0,0>>,[]>);
+test bool d1() = <<20,false,<0,0>>,[]> := eval((Command)`repeat 2[right 10;]`, (), (), <<0, false, <0,0>>,[]>);
+test bool d5() = <<10,false,<0,0>>,[]> := eval((Command)`ifelse true [right 10;][]`, (), (), <<0, false, <0,0>>,[]>);
 
 //Drawing
 test bool d1() = <<10,false,<0,0>>,[]> := eval((Command)`right 10;`, (), (), <<0, false, <0,0>>,[]>);
