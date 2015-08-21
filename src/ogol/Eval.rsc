@@ -5,6 +5,7 @@ import ogol::Canvas;
 import ParseTree;
 import String;
 import util::Math;
+import util::Eval;
 import IO;
 alias FunEnv = map[FunId id, FunDef def];
 
@@ -40,6 +41,7 @@ FunEnv collectFunDefs(Program p) = (f.id : f| /FunDef f:= p);
 // Top-level eval function
 Canvas eval(p:(Program)`<Command* cmds>`){
 	funenv = collectFunDefs(p);
+	println(funenv);
 	varEnv = ();
 	initialState = <<0, false, <0,0>>,[]>;
 	state = initialState;
@@ -125,12 +127,21 @@ State eval((Command)`left <Expr e> ;` , FunEnv fenv, VarEnv venv, State state){
 		state.turtle.dir = newDir;
         return state ;
 }
-// Bind functions arguments to the expressions provided with the call
-State eval((FunCall)`<FunId id> <Expr* exprs>;` , FunEnv fenv, VarEnv venv, State state){
-     f = fenv[id];
-     newVars = venv; // Scoping doesn't matter, I guess. Maybe if I try implementing assignment
 
-     for (arg <- zip(f.args, exprs)){
+//wat
+State eval((Command)`<FunDef f>` , FunEnv fenv, VarEnv venv, State state){
+     fenv[f.id] = f;
+	 return state;
+}
+
+// Bind functions arguments to the expressions provided with the call
+State eval((Command)`<FunId id> <Expr* exprs>;` , FunEnv fenv, VarEnv venv, State state){
+     f = fenv[id];
+     newVars = venv; //Make a copy. Scoping doesn't matter, I guess. Maybe if I try implementing assignment
+	 println(evalType(f.args));
+	 println(exprs);
+
+     for (arg <- zip(f.args, exprs)){//Wat am I even doing
     	newVars  += (arg[0]: arg[1]);
      }  
 
@@ -140,6 +151,9 @@ State eval((FunCall)`<FunId id> <Expr* exprs>;` , FunEnv fenv, VarEnv venv, Stat
 
 	 return state;
 }
+
+//test bool FunCall() = <<0,false,<0,0>>,[]>:=eval((Program)`to dash :n  right :n; pd; end dash 10;`, (), (), <<0,false,<0,0>>,[]>);
+test bool FunCall() = <<0,false,<0,0>>,[]>:=eval((Program)`dash;`, (dash:(FunDef)`to dash :n  right :n; pd; end`), (), <<0,false,<0,0>>,[]>);
 
 State eval((Block)`[ <Command* cmd> ]` , FunEnv fenv, VarEnv venv, State state){
 	for (Command c <- cmd){
@@ -163,6 +177,10 @@ State eval((ControlFlow)`ifelse <Expr e> <Block b1> <Block b2>`, FunEnv fenv, Va
 		return eval(b2, venv,state);
 	}
 }
+
+//Function Call
+
+test bool d1() = <<10,false,<0,0>>,[]> := eval((Program)`to dash :n  right :n; pd ; end dash 1;`, (), (), <<0, false, <0,0>>,[]>);
 
 
 //Logic
@@ -262,7 +280,7 @@ test bool testBool() = eval((Expr)`true`, ()) == boolean(true);
 
 test bool testMul() = eval((Expr)`:x * 2`, ((VarId)`:x`: number(2.0))) == number(4.0);
 
-test bool testDiv() = eval((Expr)`x / 2`, ((VarId)`x`: number(4.0))) == number(2.0);
+test bool testDiv() = eval((Expr)`:x / 2`, ((VarId)`:x`: number(4.0))) == number(2.0);
 
 test bool testMin() = eval((Expr)`4.0 - 2.0`,()) == number(2.0);
 
